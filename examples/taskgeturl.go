@@ -20,7 +20,7 @@ func (task *TaskGetUrl) Process() error {
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
   str := string(body)
-	fmt.Printf("Get URL: %v => %v\n", task.url, len(str))
+	fmt.Printf("Get URL: %v => %v KB\n", task.url, len(str) / 1024)
 
 	return nil
 }
