@@ -37,6 +37,16 @@ func (q *SafeQueue) Push(task Task) {
 	q.data = append(q.data, task)
 }
 
+func (q *SafeQueue) Peek() (Task, error) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	if len(q.data) == 0 {
+		return nil, fmt.Errorf("Queue is empty")
+	}
+	result := q.data[0]
+	return result, nil
+}
+
 func (q *SafeQueue) Pop() (Task, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -61,24 +71,24 @@ func (q *SafeQueue) IsEmpty() bool {
 }
 
 type Pool struct {
-	size         int
-	tasks        chan Task
-	waitingTasks SafeQueue
-	workers      []Worker
-	wg           sync.WaitGroup
-	quit         chan bool
-	noti         chan bool
+	size        int
+	tasks       chan Task
+	workerTasks chan Task
+	idleTasks   SafeQueue
+	workers     []Worker
+	wg          sync.WaitGroup
+	quit        chan bool
 }
 
 func (p *Pool) AddTask(task Task) {
-	p.waitingTasks.Push(task)
-	p.noti <- true
+	//p.idleTasks.Push(task)
+	p.tasks <- task
 }
 
 // TODO: quit it
 func (p *Pool) Join() {
 	<-p.quit
-	close(p.tasks)
+	close(p.workerTasks)
 	p.wg.Wait()
 }
 
@@ -87,21 +97,21 @@ func New(poolSize, queueCap int) *Pool {
 		poolSize = 1
 	}
 	pool := &Pool{
-		size:  poolSize,
-		tasks: make(chan Task),
-		waitingTasks: SafeQueue{
+		size:        poolSize,
+		workerTasks: make(chan Task),
+		tasks:       make(chan Task),
+		idleTasks: SafeQueue{
 			data: make([]Task, 0, queueCap),
 		},
 		workers: make([]Worker, poolSize),
 		quit:    make(chan bool),
-		noti:    make(chan bool),
 	}
 	pool.wg.Add(poolSize + 1)
 
 	for i, _ := range pool.workers {
 		pool.workers[i] = Worker{
 			id:    i,
-			tasks: pool.tasks,
+			tasks: pool.workerTasks,
 			wg:    &pool.wg,
 		}
 		go pool.workers[i].Start()
@@ -112,16 +122,22 @@ func New(poolSize, queueCap int) *Pool {
 
 func (p *Pool) run() {
 	defer p.wg.Done()
+
 	for {
-		<-p.noti
-		task, err := p.waitingTasks.Pop()
-		if err == nil {
-			p.tasks <- task
+		task, err := p.idleTasks.Peek()
+		if err != nil {
+			select {
+			case p.workerTasks <- <-p.tasks:
+			case t := <-p.tasks:
+				p.idleTasks.Push(t)
+			}
 		} else {
-			// TODO: waiting task queue is empty
-			// should wait for new task, or exit?
-			//p.quit <- true
-			//return
+			select {
+			case p.workerTasks <- task:
+				p.idleTasks.Pop()
+			case t := <-p.tasks:
+				p.idleTasks.Push(t)
+			}
 		}
 	}
 }

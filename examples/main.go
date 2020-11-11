@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"flag"
+	"fmt"
 	"log"
 	"os"
 
@@ -33,6 +34,7 @@ func main() {
 		link := s.Text()
 		pool.AddTask(&TaskGetUrl{url: link})
 	}
+  fmt.Println("Add all url. Waiting for result...")
 	err = s.Err()
 	if err != nil {
 		log.Fatal(err)
