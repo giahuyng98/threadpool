@@ -11,6 +11,7 @@ import (
 )
 
 func main() {
+
 	filePath := flag.String("f", "test.txt", "file path to read from")
 	poolSize := flag.Int("n", 1, "pool size")
 	flag.Parse()
@@ -34,7 +35,8 @@ func main() {
 		link := s.Text()
 		pool.AddTask(&TaskGetUrl{url: link})
 	}
-  fmt.Println("Add all url. Waiting for result...")
+	fmt.Println("Add all urls. Waiting for result...")
+	//pool.StartWait()
 	err = s.Err()
 	if err != nil {
 		log.Fatal(err)
