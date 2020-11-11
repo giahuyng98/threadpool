@@ -67,10 +67,12 @@ type Pool struct {
 	workers      []Worker
 	wg           sync.WaitGroup
 	quit         chan bool
+	noti         chan bool
 }
 
 func (p *Pool) AddTask(task Task) {
 	p.waitingTasks.Push(task)
+	p.noti <- true
 }
 
 // TODO: quit it
@@ -92,6 +94,7 @@ func New(poolSize, queueCap int) *Pool {
 		},
 		workers: make([]Worker, poolSize),
 		quit:    make(chan bool),
+		noti:    make(chan bool),
 	}
 	pool.wg.Add(poolSize + 1)
 
@@ -110,10 +113,13 @@ func New(poolSize, queueCap int) *Pool {
 func (p *Pool) run() {
 	defer p.wg.Done()
 	for {
+		<-p.noti
 		task, err := p.waitingTasks.Pop()
 		if err == nil {
 			p.tasks <- task
 		} else {
+			// TODO: waiting task queue is empty
+			// should wait for new task, or exit?
 			//p.quit <- true
 			//return
 		}
