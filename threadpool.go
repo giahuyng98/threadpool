@@ -25,21 +25,15 @@ func (w *Worker) Start() {
 	}
 }
 
-//
-type SafeQueue struct {
+type UnSafeQueue struct {
 	data []Task
-	mu   sync.RWMutex
 }
 
-func (q *SafeQueue) Push(task Task) {
-	q.mu.Lock()
-	defer q.mu.Unlock()
+func (q *UnSafeQueue) Push(task Task) {
 	q.data = append(q.data, task)
 }
 
-func (q *SafeQueue) Peek() (Task, error) {
-	q.mu.Lock()
-	defer q.mu.Unlock()
+func (q *UnSafeQueue) Peek() (Task, error) {
 	if len(q.data) == 0 {
 		return nil, fmt.Errorf("Queue is empty")
 	}
@@ -47,9 +41,7 @@ func (q *SafeQueue) Peek() (Task, error) {
 	return result, nil
 }
 
-func (q *SafeQueue) Pop() (Task, error) {
-	q.mu.Lock()
-	defer q.mu.Unlock()
+func (q *UnSafeQueue) Pop() (Task, error) {
 	if len(q.data) == 0 {
 		return nil, fmt.Errorf("Queue is empty")
 	}
@@ -58,15 +50,11 @@ func (q *SafeQueue) Pop() (Task, error) {
 	return result, nil
 }
 
-func (q *SafeQueue) Size() int {
-	q.mu.RLock()
-	defer q.mu.RUnlock()
+func (q *UnSafeQueue) Size() int {
 	return len(q.data)
 }
 
-func (q *SafeQueue) IsEmpty() bool {
-	q.mu.RLock()
-	defer q.mu.RUnlock()
+func (q *UnSafeQueue) IsEmpty() bool {
 	return len(q.data) == 0
 }
 
@@ -74,14 +62,13 @@ type Pool struct {
 	size        int
 	tasks       chan Task
 	workerTasks chan Task
-	idleTasks   SafeQueue
+	idleTasks   UnSafeQueue
 	workers     []Worker
 	wg          sync.WaitGroup
 	quit        chan bool
 }
 
 func (p *Pool) AddTask(task Task) {
-	//p.idleTasks.Push(task)
 	p.tasks <- task
 }
 
@@ -100,7 +87,7 @@ func New(poolSize, queueCap int) *Pool {
 		size:        poolSize,
 		workerTasks: make(chan Task),
 		tasks:       make(chan Task),
-		idleTasks: SafeQueue{
+		idleTasks: UnSafeQueue{
 			data: make([]Task, 0, queueCap),
 		},
 		workers: make([]Worker, poolSize),
