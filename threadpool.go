@@ -107,6 +107,9 @@ func New(poolSize, queueCap int) *Pool {
 	return pool
 }
 
+func (p *Pool) send(task Task) {
+}
+
 func (p *Pool) run() {
 	defer p.wg.Done()
 
@@ -114,9 +117,12 @@ func (p *Pool) run() {
 		task, err := p.idleTasks.Peek()
 		if err != nil {
 			select {
-			case p.workerTasks <- <-p.tasks:
 			case t := <-p.tasks:
-				p.idleTasks.Push(t)
+				select {
+				case p.workerTasks <- t:
+				default:
+					p.idleTasks.Push(t)
+				}
 			}
 		} else {
 			select {
