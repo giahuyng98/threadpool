@@ -116,13 +116,11 @@ func (p *Pool) run() {
 	for {
 		task, err := p.idleTasks.Peek()
 		if err != nil {
+			t := <-p.tasks
 			select {
-			case t := <-p.tasks:
-				select {
-				case p.workerTasks <- t:
-				default:
-					p.idleTasks.Push(t)
-				}
+			case p.workerTasks <- t:
+			default:
+				p.idleTasks.Push(t)
 			}
 		} else {
 			select {
